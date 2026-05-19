@@ -120,6 +120,9 @@ public class MissionSupervisor extends SubsystemBase {
         presser.stopLift();
         lift.stop();
         pusher.stop();
+
+        missionIo.clearButtonDedupe();
+        missionIo.clearMissionCmdDedupe();
     }
 
     public boolean isMissionSequenceRunning() {
@@ -140,10 +143,12 @@ public class MissionSupervisor extends SubsystemBase {
         presser.stopLift();
         lift.stop();
         pusher.stop();
-        // pressState stays where it is — re-enable + the Pi re-sending press_button
-        // would re-start the sequence cleanly from IDLE.
         pressState = PressState.IDLE;
         activeButton = "";
+        // Clear the de-dupe latches so that on resume the Pi can re-issue the
+        // same press_button / mission/cmd string and we treat it as fresh.
+        missionIo.clearButtonDedupe();
+        missionIo.clearMissionCmdDedupe();
     }
 
     private void pollStartButton() {

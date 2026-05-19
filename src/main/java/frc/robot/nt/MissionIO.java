@@ -79,6 +79,19 @@ public class MissionIO {
         return current;
     }
 
+    /**
+     * Reset the de-dupe latches so that the Pi re-publishing the same string is
+     * treated as a fresh request. Call after we abort/cancel a Pi-issued action
+     * (disable, restart) so resume actually picks the action back up.
+     */
+    public void clearButtonDedupe() {
+        lastButton = "";
+    }
+
+    public void clearMissionCmdDedupe() {
+        lastMissionCmd = "";
+    }
+
     // --- pulsed events ---
     public void firePressDone() { pressDone.fire(); }
     public void fireMissionStart() { missionStart.fire(); }
