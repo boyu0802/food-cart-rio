@@ -14,6 +14,7 @@ import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.commands.MissionSequences;
 import frc.robot.nt.MissionIO;
 import frc.robot.subsystems.lift.LiftSubsystem;
+import frc.robot.subsystems.lift.LunchLockSubsystem;
 import frc.robot.subsystems.lift.PusherSubsystem;
 import frc.robot.subsystems.presser.ButtonPresserSubsystem;
 
@@ -49,6 +50,7 @@ public class MissionSupervisor extends SubsystemBase {
     private final ButtonPresserSubsystem presser;
     private final LiftSubsystem lift;
     private final PusherSubsystem pusher;
+    private final LunchLockSubsystem locks;
     private final MissionIO missionIo;
 
     private final DigitalInput startBtn;
@@ -65,11 +67,13 @@ public class MissionSupervisor extends SubsystemBase {
     public MissionSupervisor(ButtonPresserSubsystem presser,
                              LiftSubsystem lift,
                              PusherSubsystem pusher,
+                             LunchLockSubsystem locks,
                              MissionIO missionIo,
                              int startDio, int loadedDio) {
         this.presser = presser;
         this.lift = lift;
         this.pusher = pusher;
+        this.locks = locks;
         this.missionIo = missionIo;
         this.startBtn = startDio >= 0 ? new DigitalInput(startDio) : null;
         this.loadedSensor = loadedDio >= 0 ? new DigitalInput(loadedDio) : null;
@@ -169,13 +173,13 @@ public class MissionSupervisor extends SubsystemBase {
         Command next;
         switch (cmd) {
             case "load":
-                next = MissionSequences.load(lift, pusher, missionIo, lunchPresent());
+                next = MissionSequences.load(lift, pusher, locks, missionIo, lunchPresent());
                 break;
             case "unload":
-                next = MissionSequences.unload(lift, pusher, missionIo, lunchPresent());
+                next = MissionSequences.unload(lift, pusher, locks, missionIo, lunchPresent());
                 break;
             case "stow":
-                next = MissionSequences.stow(lift, pusher);
+                next = MissionSequences.stow(lift, pusher, locks);
                 break;
             default:
                 Logger.recordOutput("Mission/unknownCommand", cmd);

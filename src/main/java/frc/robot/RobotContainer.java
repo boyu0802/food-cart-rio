@@ -28,6 +28,7 @@ import frc.robot.nt.NtOdomImuPublisher;
 import frc.robot.subsystems.drive.SwerveIOCTRE;
 import frc.robot.subsystems.drive.SwerveSubsystem;
 import frc.robot.subsystems.lift.LiftSubsystem;
+import frc.robot.subsystems.lift.LunchLockSubsystem;
 import frc.robot.subsystems.lift.PusherSubsystem;
 import frc.robot.subsystems.presser.ButtonPresserSubsystem;
 import frc.robot.supervisor.MissionSupervisor;
@@ -66,37 +67,45 @@ public class RobotContainer {
     // === cart mechanisms ===
     // Soft-limit ranges in leader-motor rotations (TUNE — measure your travel).
     // Each mechanism's encoder zeros at boot, so it MUST start at home (0).
-    private static final double LIFT_MIN_ROT = -0.5, LIFT_MAX_ROT = 50.0;
-    private static final double PUSHER_MIN_ROT = -0.5, PUSHER_MAX_ROT = 12.0;
-    private static final double PRESSER_MIN_ROT = -0.5, PRESSER_MAX_ROT = 40.0;
+    private static final double LIFT_MIN_ROT = 12, LIFT_MAX_ROT = 44.80;
+    private static final double PUSHER_MIN_ROT = 0.3, PUSHER_MAX_ROT = 38.550;
+    private static final double PRESSER_MIN_ROT = 3.0, PRESSER_MAX_ROT = 54.94;
 
     // Lunch lift: 2 NEO Vortex (1 each side, follower inverted)
     private final LiftSubsystem lift = new LiftSubsystem(
         "Lift",
-        /* leader */ 20,
-        /* followers */ new int[] { 21 },
+        /* leader */ 3,
+        /* followers */ new int[] { 4 },
         /* followerInverted */ new boolean[] { true },
         /* kP */ 0.05,
         LIFT_MIN_ROT, LIFT_MAX_ROT);
 
     // Horizontal pusher on top of the lift: 2 NEO Vortex (leader + inverted follower)
     private final PusherSubsystem pusher = new PusherSubsystem(
-        /* leader */ 22,
-        /* follower */ 23,
+        /* leader */ 1,
+        /* follower */ 2,
         /* followerInverted */ true,
         /* kP */ 0.05,
         PUSHER_MIN_ROT, PUSHER_MAX_ROT);
 
     // Button-press arm: 1 NEO Vortex (vertical lift) + REV PH pneumatic poker on top
     private final ButtonPresserSubsystem presser = new ButtonPresserSubsystem(
-        /* canId */ 24,
+        /* canId */ 5,
         /* kP */ 0.05,
         PRESSER_MIN_ROT, PRESSER_MAX_ROT,
-        /* phModuleId */ 1,
-        /* solenoidChan */ 0);
+        /* phModuleId */ 2,
+        /* solenoidChan */ 2);
+
+    // Two single-acting lunch locks. energizedToLock flags set OPPOSITE as a
+    // starting guess for "one opens, one closes" — verify on the bench and flip
+    // whichever is backwards. Channels are placeholders.
+    private final LunchLockSubsystem lunchLocks = new LunchLockSubsystem(
+        /* phModuleId */ 2,
+        /* robotLockChan */ 0, /* robotEnergizedToLock */ true,
+        /* transferLockChan */ 1, /* transferEnergizedToLock */ false);
 
     private final MissionSupervisor missionSupervisor = new MissionSupervisor(
-        presser, lift, pusher, missionIO,
+        presser, lift, pusher, lunchLocks, missionIO,
         /* startDio */ -1,
         /* loadedDio */ -1);
 
