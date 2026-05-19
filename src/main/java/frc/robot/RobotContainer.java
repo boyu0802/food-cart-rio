@@ -72,12 +72,16 @@ public class RobotContainer {
         /* followerInverted */ new boolean[] { true },
         /* kP */ 0.05);
 
-    // Horizontal pusher on top of the lift: 1 NEO Vortex
-    private final PusherSubsystem pusher = new PusherSubsystem(/* canId */ 22, /* kP */ 0.05);
+    // Horizontal pusher on top of the lift: 2 NEO Vortex (leader + inverted follower)
+    private final PusherSubsystem pusher = new PusherSubsystem(
+        /* leader */ 22,
+        /* follower */ 23,
+        /* followerInverted */ true,
+        /* kP */ 0.05);
 
     // Button-press arm: 1 NEO Vortex (vertical lift) + REV PH pneumatic poker on top
     private final ButtonPresserSubsystem presser = new ButtonPresserSubsystem(
-        /* canId */ 23,
+        /* canId */ 24,
         /* kP */ 0.05,
         /* phModuleId */ 1,
         /* solenoidChan */ 0);

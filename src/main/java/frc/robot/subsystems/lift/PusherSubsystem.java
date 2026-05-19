@@ -22,13 +22,16 @@ import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 
 /**
- * Horizontal pusher on top of the small lift — 1x NEO Vortex.
- * Pushes lunches out, pulls them back in.
+ * Horizontal pusher on top of the lift — 2x NEO Vortex (leader + follower).
+ * Pushes lunches out, pulls them back in. The follower mirrors the leader and is
+ * inverted (motors face opposite directions across the mechanism).
  *
- * Treat "extended" / "retracted" as named positions; tune in MissionSupervisor.
+ * Treat "extended" / "retracted" as named positions; tune in MissionSequences.
  */
 public class PusherSubsystem extends SubsystemBase {
-    private final SparkFlex motor;
+    private final SparkFlex leader;
+    @SuppressWarnings("unused")
+    private final SparkFlex follower;
     private final RelativeEncoder encoder;
     private final SparkClosedLoopController controller;
 
@@ -37,15 +40,27 @@ public class PusherSubsystem extends SubsystemBase {
 
     private final SysIdRoutine sysIdRoutine;
 
-    public PusherSubsystem(int canId, double kP) {
-        motor = new SparkFlex(canId, MotorType.kBrushless);
-        SparkFlexConfig cfg = new SparkFlexConfig();
-        cfg.idleMode(IdleMode.kBrake).smartCurrentLimit(40);
-        cfg.closedLoop.pid(kP, 0.0, 0.0).outputRange(-1.0, 1.0);
-        motor.configure(cfg, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+    /**
+     * @param leaderCanId      CAN ID of the leader SparkFlex
+     * @param followerCanId    CAN ID of the follower SparkFlex
+     * @param followerInverted whether the follower runs opposite to the leader
+     * @param kP               position-loop P gain
+     */
+    public PusherSubsystem(int leaderCanId, int followerCanId, boolean followerInverted, double kP) {
+        leader = new SparkFlex(leaderCanId, MotorType.kBrushless);
+        SparkFlexConfig leaderCfg = new SparkFlexConfig();
+        leaderCfg.idleMode(IdleMode.kBrake).smartCurrentLimit(40);
+        leaderCfg.closedLoop.pid(kP, 0.0, 0.0).outputRange(-1.0, 1.0);
+        leader.configure(leaderCfg, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
-        encoder = motor.getEncoder();
-        controller = motor.getClosedLoopController();
+        follower = new SparkFlex(followerCanId, MotorType.kBrushless);
+        SparkFlexConfig followerCfg = new SparkFlexConfig();
+        followerCfg.idleMode(IdleMode.kBrake).smartCurrentLimit(40);
+        followerCfg.follow(leader, followerInverted);
+        follower.configure(followerCfg, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+
+        encoder = leader.getEncoder();
+        controller = leader.getClosedLoopController();
         encoder.setPosition(0.0);
 
         sysIdRoutine = new SysIdRoutine(
@@ -55,9 +70,9 @@ public class PusherSubsystem extends SubsystemBase {
                 Seconds.of(2.0),
                 state -> Logger.recordOutput("Pusher/SysIdState", state.toString())),
             new SysIdRoutine.Mechanism(
-                volts -> motor.setVoltage(volts.in(Volts)),
+                volts -> leader.setVoltage(volts.in(Volts)),
                 log -> log.motor("pusher")
-                    .voltage(Volts.of(motor.getAppliedOutput() * motor.getBusVoltage()))
+                    .voltage(Volts.of(leader.getAppliedOutput() * leader.getBusVoltage()))
                     .angularPosition(Rotations.of(encoder.getPosition()))
                     .angularVelocity(RotationsPerSecond.of(encoder.getVelocity() / 60.0)),
                 this));
@@ -79,12 +94,12 @@ public class PusherSubsystem extends SubsystemBase {
 
     public void setOpenLoop(double percent) {
         closedLoopActive = false;
-        motor.set(percent);
+        leader.set(percent);
     }
 
     public void stop() {
         closedLoopActive = false;
-        motor.set(0.0);
+        leader.set(0.0);
     }
 
     public double getPosition() {
