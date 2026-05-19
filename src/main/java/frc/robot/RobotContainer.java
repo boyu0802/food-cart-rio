@@ -20,6 +20,7 @@ import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
+import frc.robot.commands.MissionSequences;
 import frc.robot.commands.Nav2Drive;
 import frc.robot.generated.TunerConstants;
 import frc.robot.nt.MissionIO;
@@ -38,6 +39,7 @@ public class RobotContainer {
     // tuning knobs
     private static final double LIFT_JOG_SCALE = 0.4;     // operator |stick| -> % output
     private static final double PUSHER_JOG_SCALE = 0.4;
+    private static final double PRESSER_JOG_SCALE = 0.3;  // held-button % output
     private static final double STICK_DEADBAND = 0.1;
 
     // operator preset positions, in leader-motor rotations (TUNE)
@@ -45,6 +47,7 @@ public class RobotContainer {
     private static final double LIFT_DELIVER_ROT = 8.0;
     private static final double PUSHER_RETRACTED_ROT = 0.0;
     private static final double PUSHER_EXTENDED_ROT = 5.0;
+    private static final double PRESSER_TEST_ROT = 20.0; // bench press-test height
 
     // === driver / operator inputs ===
     private final CommandXboxController driver = new CommandXboxController(0);
@@ -162,47 +165,80 @@ public class RobotContainer {
     }
 
     private void configureBindings() {
-        // ---- driver: swerve ----
+        Trigger teleop = RobotModeTriggers.teleop();
+        Trigger test = RobotModeTriggers.test();
+
+        // ================= DRIVER (port 0) =================
+        // swerve
         driver.leftBumper().onTrue(swerve.setFieldCentric());
 
-        // ---- right trigger = "Pi is driving" ----
-        // Held:
-        //   - Nav2Drive owns the swerve (default teleop is locked out by the
-        //     subsystem requirement, so sticks have no effect)
-        //   - enable=true is published, so mission sequences + press machine advance
-        // Released:
-        //   - Nav2Drive ends, default teleop resumes, sticks work normally
-        //   - enable=false is published, so sequences freeze / cancel
+        // right trigger = "Pi is driving": Nav2Drive owns the swerve (sticks locked
+        // out) and enable=true. Release -> teleop sticks resume, enable=false.
         driver.rightTrigger(0.5).whileTrue(nav2Drive);
         driver.rightTrigger(0.5).onTrue(Commands.runOnce(() -> missionIO.setEnable(true)));
         driver.rightTrigger(0.5).onFalse(Commands.runOnce(() -> missionIO.setEnable(false)));
 
-        // ---- restart/abort: cancel sequences, return everything to IDLE,
-        // pulse Robot/mission/restart_pressed so the Pi can drop its plan too.
+        // restart/abort
         driver.back().onTrue(Commands.runOnce(() -> {
             missionIO.fireMissionRestart();
             missionSupervisor.restart();
         }));
 
-        // ---- operator: lift presets ----
-        operator.a().onTrue(Commands.runOnce(() -> lift.setPosition(LIFT_HOME_ROT), lift));
-        operator.b().onTrue(Commands.runOnce(() -> lift.setPosition(LIFT_DELIVER_ROT), lift));
+        // ---- DRIVER face buttons: full-sequence bench tests ----
+        // These schedule the sequences directly, bypassing the Pi + dead-man, so
+        // you can dry-run the whole motion on the bench. Suppliers fake the lunch
+        // sensor so the sequence doesn't stall waiting on it.
+        driver.a().onTrue(MissionSequences.load(lift, pusher, lunchLocks, missionIO, () -> true));
+        driver.b().onTrue(MissionSequences.unload(lift, pusher, lunchLocks, missionIO, () -> false));
+        driver.x().onTrue(MissionSequences.stow(lift, pusher, lunchLocks));
+        driver.y().onTrue(pressTest());
 
-        // ---- operator: pusher presets ----
-        operator.x().onTrue(Commands.runOnce(() -> pusher.setPosition(PUSHER_RETRACTED_ROT), pusher));
-        operator.y().onTrue(Commands.runOnce(() -> pusher.setPosition(PUSHER_EXTENDED_ROT), pusher));
+        // ================= OPERATOR (port 1) =================
+        // (defaults: left Y jogs lift, right Y jogs pusher — set in constructor)
 
-        // ---- operator: manual poker fire (for testing the presser arm without Pi) ----
+        // ---- lift / pusher presets (teleop only, so they don't clash with SysId
+        //      which reuses A/B/X/Y in Test mode) ----
+        teleop.and(operator.a()).onTrue(Commands.runOnce(() -> lift.setPosition(LIFT_HOME_ROT), lift));
+        teleop.and(operator.b()).onTrue(Commands.runOnce(() -> lift.setPosition(LIFT_DELIVER_ROT), lift));
+        teleop.and(operator.x()).onTrue(Commands.runOnce(() -> pusher.setPosition(PUSHER_RETRACTED_ROT), pusher));
+        teleop.and(operator.y()).onTrue(Commands.runOnce(() -> pusher.setPosition(PUSHER_EXTENDED_ROT), pusher));
+
+        // ---- presser lift jog (hold) + poker ----
+        operator.leftBumper().whileTrue(Commands.run(() -> presser.setOpenLoop(PRESSER_JOG_SCALE), presser));
+        operator.leftBumper().onFalse(Commands.runOnce(presser::stopLift, presser));
+        operator.leftTrigger(0.5).whileTrue(Commands.run(() -> presser.setOpenLoop(-PRESSER_JOG_SCALE), presser));
+        operator.leftTrigger(0.5).onFalse(Commands.runOnce(presser::stopLift, presser));
         operator.rightBumper().onTrue(Commands.runOnce(presser::extendPoker));
         operator.rightBumper().onFalse(Commands.runOnce(presser::retractPoker));
 
-        // ---- SysId (Test mode on the Driver Station only) ----
-        // Pick the target on Shuffleboard/Elastic → "SysId/Target" chooser.
-        Trigger test = RobotModeTriggers.test();
+        // ---- lunch locks (D-pad): up=lock robot, down=unlock robot,
+        //      left=lock transfer, right=unlock transfer ----
+        operator.povUp().onTrue(Commands.runOnce(lunchLocks::lockRobot));
+        operator.povDown().onTrue(Commands.runOnce(lunchLocks::unlockRobot));
+        operator.povLeft().onTrue(Commands.runOnce(lunchLocks::lockTransfer));
+        operator.povRight().onTrue(Commands.runOnce(lunchLocks::unlockTransfer));
+
+        // ================= SysId (Test mode only) =================
+        // Pick the target on the "SysId/Target" chooser (Shuffleboard/Elastic).
         test.and(operator.a()).whileTrue(sysId.quasistatic(SysIdRoutine.Direction.kForward));
         test.and(operator.b()).whileTrue(sysId.quasistatic(SysIdRoutine.Direction.kReverse));
         test.and(operator.x()).whileTrue(sysId.dynamic(SysIdRoutine.Direction.kForward));
         test.and(operator.y()).whileTrue(sysId.dynamic(SysIdRoutine.Direction.kReverse));
+    }
+
+    /** Full presser cycle for the bench: lift to height, poke, retract, return home. */
+    private Command pressTest() {
+        return Commands.sequence(
+            Commands.runOnce(presser::retractPoker),
+            Commands.runOnce(() -> presser.setLiftPosition(PRESSER_TEST_ROT), presser),
+            Commands.waitUntil(() -> presser.liftAtPosition(0.5)),
+            Commands.runOnce(presser::extendPoker),
+            Commands.waitSeconds(0.5),
+            Commands.runOnce(presser::retractPoker),
+            Commands.waitSeconds(0.3),
+            Commands.runOnce(() -> presser.setLiftPosition(0.0), presser),
+            Commands.waitUntil(() -> presser.liftAtPosition(0.5))
+        ).withName("PressTest");
     }
 
     /** Called once per main loop tick from Robot.robotPeriodic. */
