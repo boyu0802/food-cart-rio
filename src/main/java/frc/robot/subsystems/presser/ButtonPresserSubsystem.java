@@ -45,14 +45,20 @@ public class ButtonPresserSubsystem extends SubsystemBase {
     /**
      * @param canId         CAN ID of the lift NEO Vortex (SparkFlex)
      * @param kP            position-loop P gain
+     * @param minRotations  reverse soft limit (motor rotations); ~0 at home
+     * @param maxRotations  forward soft limit (motor rotations); top of travel
      * @param phModuleId    CAN ID of the REV PH (1 by default)
      * @param solenoidChan  PH solenoid channel powering the poker
      */
-    public ButtonPresserSubsystem(int canId, double kP, int phModuleId, int solenoidChan) {
+    public ButtonPresserSubsystem(int canId, double kP, double minRotations, double maxRotations,
+                                  int phModuleId, int solenoidChan) {
         motor = new SparkFlex(canId, MotorType.kBrushless);
         SparkFlexConfig cfg = new SparkFlexConfig();
         cfg.idleMode(IdleMode.kBrake).smartCurrentLimit(40);
         cfg.closedLoop.pid(kP, 0.0, 0.0).outputRange(-1.0, 1.0);
+        cfg.softLimit
+            .forwardSoftLimit(maxRotations).forwardSoftLimitEnabled(true)
+            .reverseSoftLimit(minRotations).reverseSoftLimitEnabled(true);
         motor.configure(cfg, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
         encoder = motor.getEncoder();

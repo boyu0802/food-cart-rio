@@ -64,25 +64,34 @@ public class RobotContainer {
     private final MissionIO missionIO = new MissionIO();
 
     // === cart mechanisms ===
+    // Soft-limit ranges in leader-motor rotations (TUNE — measure your travel).
+    // Each mechanism's encoder zeros at boot, so it MUST start at home (0).
+    private static final double LIFT_MIN_ROT = -0.5, LIFT_MAX_ROT = 50.0;
+    private static final double PUSHER_MIN_ROT = -0.5, PUSHER_MAX_ROT = 12.0;
+    private static final double PRESSER_MIN_ROT = -0.5, PRESSER_MAX_ROT = 40.0;
+
     // Lunch lift: 2 NEO Vortex (1 each side, follower inverted)
     private final LiftSubsystem lift = new LiftSubsystem(
         "Lift",
         /* leader */ 20,
         /* followers */ new int[] { 21 },
         /* followerInverted */ new boolean[] { true },
-        /* kP */ 0.05);
+        /* kP */ 0.05,
+        LIFT_MIN_ROT, LIFT_MAX_ROT);
 
     // Horizontal pusher on top of the lift: 2 NEO Vortex (leader + inverted follower)
     private final PusherSubsystem pusher = new PusherSubsystem(
         /* leader */ 22,
         /* follower */ 23,
         /* followerInverted */ true,
-        /* kP */ 0.05);
+        /* kP */ 0.05,
+        PUSHER_MIN_ROT, PUSHER_MAX_ROT);
 
     // Button-press arm: 1 NEO Vortex (vertical lift) + REV PH pneumatic poker on top
     private final ButtonPresserSubsystem presser = new ButtonPresserSubsystem(
         /* canId */ 24,
         /* kP */ 0.05,
+        PRESSER_MIN_ROT, PRESSER_MAX_ROT,
         /* phModuleId */ 1,
         /* solenoidChan */ 0);
 

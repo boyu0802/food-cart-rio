@@ -26,11 +26,13 @@ import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
  * Pushes lunches out, pulls them back in. The follower mirrors the leader and is
  * inverted (motors face opposite directions across the mechanism).
  *
+ * Position units are leader rotations. Soft limits (same units) are enforced on
+ * the leader in every control mode; the encoder zeros at boot, so the pusher MUST
+ * start fully retracted (or wherever you call "home") for the limits to be right.
  * Treat "extended" / "retracted" as named positions; tune in MissionSequences.
  */
 public class PusherSubsystem extends SubsystemBase {
     private final SparkFlex leader;
-    @SuppressWarnings("unused")
     private final SparkFlex follower;
     private final RelativeEncoder encoder;
     private final SparkClosedLoopController controller;
@@ -45,12 +47,18 @@ public class PusherSubsystem extends SubsystemBase {
      * @param followerCanId    CAN ID of the follower SparkFlex
      * @param followerInverted whether the follower runs opposite to the leader
      * @param kP               position-loop P gain
+     * @param minRotations     reverse soft limit (leader rotations); ~0 retracted
+     * @param maxRotations     forward soft limit (leader rotations); fully extended
      */
-    public PusherSubsystem(int leaderCanId, int followerCanId, boolean followerInverted, double kP) {
+    public PusherSubsystem(int leaderCanId, int followerCanId, boolean followerInverted, double kP,
+                           double minRotations, double maxRotations) {
         leader = new SparkFlex(leaderCanId, MotorType.kBrushless);
         SparkFlexConfig leaderCfg = new SparkFlexConfig();
         leaderCfg.idleMode(IdleMode.kBrake).smartCurrentLimit(40);
         leaderCfg.closedLoop.pid(kP, 0.0, 0.0).outputRange(-1.0, 1.0);
+        leaderCfg.softLimit
+            .forwardSoftLimit(maxRotations).forwardSoftLimitEnabled(true)
+            .reverseSoftLimit(minRotations).reverseSoftLimitEnabled(true);
         leader.configure(leaderCfg, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
         follower = new SparkFlex(followerCanId, MotorType.kBrushless);
@@ -119,5 +127,7 @@ public class PusherSubsystem extends SubsystemBase {
         Logger.recordOutput("Pusher/position", getPosition());
         Logger.recordOutput("Pusher/target", targetRotations);
         Logger.recordOutput("Pusher/closedLoop", closedLoopActive);
+        Logger.recordOutput("Pusher/leaderCurrent", leader.getOutputCurrent());
+        Logger.recordOutput("Pusher/followerCurrent", follower.getOutputCurrent());
     }
 }
