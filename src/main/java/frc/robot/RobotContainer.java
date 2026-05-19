@@ -142,11 +142,16 @@ public class RobotContainer {
     private void configureBindings() {
         // ---- driver: swerve ----
         driver.leftBumper().onTrue(swerve.setFieldCentric());
-        // hold POV down to hand control to the Pi (Nav2 / cmd_vel)
-        driver.povDown().whileTrue(nav2Drive);
 
-        // ---- dead-man enable: hold right trigger to let the Pi-driven state
-        // machines advance. Release = freeze (Pi nav stops, mission sequences cancel).
+        // ---- right trigger = "Pi is driving" ----
+        // Held:
+        //   - Nav2Drive owns the swerve (default teleop is locked out by the
+        //     subsystem requirement, so sticks have no effect)
+        //   - enable=true is published, so mission sequences + press machine advance
+        // Released:
+        //   - Nav2Drive ends, default teleop resumes, sticks work normally
+        //   - enable=false is published, so sequences freeze / cancel
+        driver.rightTrigger(0.5).whileTrue(nav2Drive);
         driver.rightTrigger(0.5).onTrue(Commands.runOnce(() -> missionIO.setEnable(true)));
         driver.rightTrigger(0.5).onFalse(Commands.runOnce(() -> missionIO.setEnable(false)));
 
