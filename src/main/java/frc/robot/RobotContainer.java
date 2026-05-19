@@ -85,8 +85,7 @@ public class RobotContainer {
     private final MissionSupervisor missionSupervisor = new MissionSupervisor(
         presser, lift, pusher, missionIO,
         /* startDio */ -1,
-        /* loadedDio */ -1,
-        /* unloadedDio */ -1);
+        /* loadedDio */ -1);
 
     private final Compressor compressor = new Compressor(/* phModuleId */ 1, PneumaticsModuleType.REVPH);
 
@@ -95,7 +94,7 @@ public class RobotContainer {
         Set.<Subsystem>of(swerve, lift, pusher, presser));
 
     // === commands ===
-    private final Nav2Drive nav2Drive = new Nav2Drive(swerve, navCmd);
+    private final Nav2Drive nav2Drive = new Nav2Drive(swerve, navCmd, missionIO);
 
     private final SwerveRequest.FieldCentric teleopRequest = new FieldCentric()
         .withDriveRequestType(DriveRequestType.Velocity);
@@ -146,6 +145,18 @@ public class RobotContainer {
         // hold POV down to hand control to the Pi (Nav2 / cmd_vel)
         driver.povDown().whileTrue(nav2Drive);
 
+        // ---- dead-man enable: hold right trigger to let the Pi-driven state
+        // machines advance. Release = freeze (Pi nav stops, mission sequences cancel).
+        driver.rightTrigger(0.5).onTrue(Commands.runOnce(() -> missionIO.setEnable(true)));
+        driver.rightTrigger(0.5).onFalse(Commands.runOnce(() -> missionIO.setEnable(false)));
+
+        // ---- restart/abort: cancel sequences, return everything to IDLE,
+        // pulse Robot/mission/restart_pressed so the Pi can drop its plan too.
+        driver.back().onTrue(Commands.runOnce(() -> {
+            missionIO.fireMissionRestart();
+            missionSupervisor.restart();
+        }));
+
         // ---- operator: lift presets ----
         operator.a().onTrue(Commands.runOnce(() -> lift.setPosition(LIFT_HOME_ROT), lift));
         operator.b().onTrue(Commands.runOnce(() -> lift.setPosition(LIFT_DELIVER_ROT), lift));
@@ -174,6 +185,6 @@ public class RobotContainer {
 
     public Command getAutonomousCommand() {
         // In auto, just follow whatever the Pi is publishing on Nav/cmd.
-        return new Nav2Drive(swerve, navCmd);
+        return new Nav2Drive(swerve, navCmd, missionIO);
     }
 }

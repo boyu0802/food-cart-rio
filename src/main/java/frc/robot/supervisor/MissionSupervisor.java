@@ -18,17 +18,22 @@ import frc.robot.subsystems.lift.PusherSubsystem;
 import frc.robot.subsystems.presser.ButtonPresserSubsystem;
 
 /**
- * Top-level mission coordinator. Two responsibilities:
+ * Top-level mission coordinator with dead-man enable.
  *
- *  1. Run the button-press state machine for the {@link ButtonPresserSubsystem}
- *     whenever the Pi publishes a string to {@code Pi/elevator/press_button}.
- *  2. Listen for higher-level Pi mission commands (load / unload / stow) on
- *     {@code Pi/mission/cmd} and schedule the matching sequence on the lift +
- *     pusher. Each sequence pulses the corresponding mission event on NT when
- *     it finishes.
- *
- * Physical sensors on the cart (start button, lunch-loaded, lunch-unloaded)
- * are also polled here and forwarded to the Pi as rising-edge events.
+ *  - Listens for {@code Pi/elevator/press_button} → runs the button-press state
+ *    machine on the {@link ButtonPresserSubsystem}, then pulses {@code press_done}.
+ *  - Listens for {@code Pi/mission/cmd} ("load" / "unload" / "stow") → schedules
+ *    the matching {@link MissionSequences} command, which pulses
+ *    {@code loaded}/{@code unloaded} on completion.
+ *  - Watches the {@code startBtn} DIO and pulses {@code mission/start_pressed}
+ *    on its rising edge. (The {@code loadedSensor} / {@code unloadedSensor} are
+ *    still read — only used as the {@link BooleanSupplier} for waitUntil inside
+ *    sequences — they DO NOT pulse loaded/unloaded any more, since the sequence
+ *    fires those at completion and we don't want a double-edge.)
+ *  - Dead-man: while {@code missionIo.isEnabled() == false}, the press machine
+ *    is frozen and the active mission sequence is canceled. Motors stop. No
+ *    completion events fire.
+ *  - {@link #restart()} aborts everything and returns to IDLE.
  */
 public class MissionSupervisor extends SubsystemBase {
     public enum PressState { IDLE, LIFT_TO_HEIGHT, EXTEND_POKER, HOLD, RETRACT_POKER, LIFT_HOME, DONE }
@@ -39,7 +44,6 @@ public class MissionSupervisor extends SubsystemBase {
     private static final double POKER_RETRACT_TIME_SEC = 0.25;
     private static final double LIFT_HOME_ROT = 0.0;
 
-    // press_button name -> presser-lift target. TUNE per elevator car.
     private final Map<String, Double> buttonHeights = new HashMap<>();
 
     private final ButtonPresserSubsystem presser;
@@ -49,38 +53,26 @@ public class MissionSupervisor extends SubsystemBase {
 
     private final DigitalInput startBtn;
     private final DigitalInput loadedSensor;
-    private final DigitalInput unloadedSensor;
     private boolean lastStart = false;
-    private boolean lastLoaded = false;
-    private boolean lastUnloaded = false;
 
     private PressState pressState = PressState.IDLE;
     private double pressStateEnteredFpga = 0.0;
     private String activeButton = "";
 
     private Command activeMissionSequence = null;
+    private boolean wasEnabled = false;
 
-    /**
-     * @param presser     button-press arm
-     * @param lift        lunch lift (2 NEO Vortex)
-     * @param pusher      horizontal pusher
-     * @param missionIo   NT mission channel
-     * @param startDio    DIO channel for "start mission" button. -1 to skip.
-     * @param loadedDio   DIO channel for lunch-present sensor. -1 to skip.
-     * @param unloadedDio DIO channel for "lunch removed" sensor. -1 to skip.
-     */
     public MissionSupervisor(ButtonPresserSubsystem presser,
                              LiftSubsystem lift,
                              PusherSubsystem pusher,
                              MissionIO missionIo,
-                             int startDio, int loadedDio, int unloadedDio) {
+                             int startDio, int loadedDio) {
         this.presser = presser;
         this.lift = lift;
         this.pusher = pusher;
         this.missionIo = missionIo;
         this.startBtn = startDio >= 0 ? new DigitalInput(startDio) : null;
         this.loadedSensor = loadedDio >= 0 ? new DigitalInput(loadedDio) : null;
-        this.unloadedSensor = unloadedDio >= 0 ? new DigitalInput(unloadedDio) : null;
 
         buttonHeights.put("call_up", 10.0);
         buttonHeights.put("call_down", 8.0);
@@ -92,18 +84,44 @@ public class MissionSupervisor extends SubsystemBase {
 
     @Override
     public void periodic() {
-        pollPhysicalSensors();
-        dispatchMissionCommand();
-        stepPressMachine();
-        missionIo.periodic();
+        boolean enabled = missionIo.isEnabled();
 
+        if (wasEnabled && !enabled) {
+            freezeOnDisable();
+        }
+        wasEnabled = enabled;
+
+        pollStartButton();              // start_pressed always reports (operator may want it any time)
+
+        if (enabled) {
+            dispatchMissionCommand();
+            stepPressMachine();
+        }
+
+        missionIo.periodic();           // maintain edge pulses for everything we fired
+
+        Logger.recordOutput("Mission/enabled", enabled);
         Logger.recordOutput("Mission/pressState", pressState.toString());
         Logger.recordOutput("Mission/activeButton", activeButton);
         Logger.recordOutput("Mission/activeSequence",
             activeMissionSequence == null ? "" : activeMissionSequence.getName());
     }
 
-    /** True while a Pi-issued load/unload/stow sequence is running. */
+    /** Abort everything. Cancel current sequence, return press machine to IDLE, stop motors. */
+    public void restart() {
+        if (activeMissionSequence != null && activeMissionSequence.isScheduled()) {
+            activeMissionSequence.cancel();
+        }
+        activeMissionSequence = null;
+        pressState = PressState.IDLE;
+        activeButton = "";
+
+        presser.retractPoker();
+        presser.stopLift();
+        lift.stop();
+        pusher.stop();
+    }
+
     public boolean isMissionSequenceRunning() {
         return activeMissionSequence != null && activeMissionSequence.isScheduled();
     }
@@ -114,22 +132,25 @@ public class MissionSupervisor extends SubsystemBase {
 
     // ---- internals ----
 
-    private void pollPhysicalSensors() {
-        if (startBtn != null) {
-            boolean cur = !startBtn.get();
-            if (cur && !lastStart) missionIo.fireMissionStart();
-            lastStart = cur;
+    private void freezeOnDisable() {
+        if (activeMissionSequence != null && activeMissionSequence.isScheduled()) {
+            activeMissionSequence.cancel();
         }
-        if (loadedSensor != null) {
-            boolean cur = !loadedSensor.get();
-            if (cur && !lastLoaded) missionIo.fireMissionLoaded();
-            lastLoaded = cur;
-        }
-        if (unloadedSensor != null) {
-            boolean cur = !unloadedSensor.get();
-            if (cur && !lastUnloaded) missionIo.fireMissionUnloaded();
-            lastUnloaded = cur;
-        }
+        presser.retractPoker();
+        presser.stopLift();
+        lift.stop();
+        pusher.stop();
+        // pressState stays where it is — re-enable + the Pi re-sending press_button
+        // would re-start the sequence cleanly from IDLE.
+        pressState = PressState.IDLE;
+        activeButton = "";
+    }
+
+    private void pollStartButton() {
+        if (startBtn == null) return;
+        boolean cur = !startBtn.get();
+        if (cur && !lastStart) missionIo.fireMissionStart();
+        lastStart = cur;
     }
 
     private BooleanSupplier lunchPresent() {

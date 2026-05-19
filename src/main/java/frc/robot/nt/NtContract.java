@@ -38,6 +38,10 @@ public final class NtContract {
     public static final String ROBOT_MISSION_START_KEY = "Robot/mission/start_pressed";
     public static final String ROBOT_MISSION_LOADED_KEY = "Robot/mission/loaded";
     public static final String ROBOT_MISSION_UNLOADED_KEY = "Robot/mission/unloaded";
+    /** Held-true while the operator is holding the dead-man enable button. Not pulsed. */
+    public static final String ROBOT_ENABLE_KEY = "Robot/mission/enable";
+    /** Pulsed when the operator hits the restart/abort button. */
+    public static final String ROBOT_RESTART_KEY = "Robot/mission/restart_pressed";
 
     // Watchdog: max age of last heartbeat tick (s). Matches nt_bridge's cmd_vel_max_age default.
     public static final double NAV_CMD_MAX_AGE_SEC = 0.5;
