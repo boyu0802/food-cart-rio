@@ -1,5 +1,10 @@
 package frc.robot.subsystems.presser;
 
+import static edu.wpi.first.units.Units.Rotations;
+import static edu.wpi.first.units.Units.RotationsPerSecond;
+import static edu.wpi.first.units.Units.Seconds;
+import static edu.wpi.first.units.Units.Volts;
+
 import org.littletonrobotics.junction.Logger;
 
 import com.revrobotics.PersistMode;
@@ -14,7 +19,9 @@ import com.revrobotics.spark.config.SparkFlexConfig;
 
 import edu.wpi.first.wpilibj.PneumaticsModuleType;
 import edu.wpi.first.wpilibj.Solenoid;
+import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 
 /**
  * The button-press arm: a single NEO Vortex driving a vertical lift, with a
@@ -32,6 +39,8 @@ public class ButtonPresserSubsystem extends SubsystemBase {
     private double targetRotations = 0.0;
     private boolean closedLoopActive = false;
     private boolean pokerExtended = false;
+
+    private final SysIdRoutine sysIdRoutine;
 
     /**
      * @param canId         CAN ID of the lift NEO Vortex (SparkFlex)
@@ -52,6 +61,28 @@ public class ButtonPresserSubsystem extends SubsystemBase {
 
         poker = new Solenoid(phModuleId, PneumaticsModuleType.REVPH, solenoidChan);
         poker.set(false);
+
+        sysIdRoutine = new SysIdRoutine(
+            new SysIdRoutine.Config(
+                Volts.of(0.5).per(Seconds),
+                Volts.of(3.0),
+                Seconds.of(3.0),
+                state -> Logger.recordOutput("ButtonPresser/SysIdState", state.toString())),
+            new SysIdRoutine.Mechanism(
+                volts -> motor.setVoltage(volts.in(Volts)),
+                log -> log.motor("presser-lift")
+                    .voltage(Volts.of(motor.getAppliedOutput() * motor.getBusVoltage()))
+                    .angularPosition(Rotations.of(encoder.getPosition()))
+                    .angularVelocity(RotationsPerSecond.of(encoder.getVelocity() / 60.0)),
+                this));
+    }
+
+    public Command sysIdQuasistatic(SysIdRoutine.Direction direction) {
+        return sysIdRoutine.quasistatic(direction);
+    }
+
+    public Command sysIdDynamic(SysIdRoutine.Direction direction) {
+        return sysIdRoutine.dynamic(direction);
     }
 
     public void setLiftPosition(double rotations) {

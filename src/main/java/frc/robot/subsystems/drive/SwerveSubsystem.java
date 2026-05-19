@@ -35,9 +35,7 @@ public class SwerveSubsystem extends SubsystemBase {
     private final SwerveRequest.SysIdSwerveRotation kRotationSysid = new SysIdSwerveRotation();
 
     private final SysIdRoutine m_sysIdRoutineTranslation;
-    @SuppressWarnings("unused")
     private final SysIdRoutine m_sysIdRoutineSteer;
-    private final SysIdRoutine m_sysIdRoutineToApply;
 
     public SwerveSubsystem(SwerveIO io) {
         this.io = io;
@@ -45,18 +43,16 @@ public class SwerveSubsystem extends SubsystemBase {
         m_sysIdRoutineTranslation = new SysIdRoutine(
             new SysIdRoutine.Config(
                 null, Volts.of(4), Seconds.of(5.0),
-                state -> Logger.recordOutput("Drive/SysIdState", state.toString())),
+                state -> Logger.recordOutput("Drive/SysIdTranslationState", state.toString())),
             new SysIdRoutine.Mechanism(
                 output -> io.runCharacterization(kDriveSysid.withVolts(output)), null, this));
 
         m_sysIdRoutineSteer = new SysIdRoutine(
             new SysIdRoutine.Config(
                 null, Volts.of(7), null,
-                state -> Logger.recordOutput("Drive/SysIdState", state.toString())),
+                state -> Logger.recordOutput("Drive/SysIdSteerState", state.toString())),
             new SysIdRoutine.Mechanism(
                 volts -> io.runCharacterization(kSteerSysid.withVolts(volts)), null, this));
-
-        m_sysIdRoutineToApply = m_sysIdRoutineTranslation;
 
         SubsystemDataProcessor.createSubsystemDataProcessor(io, () -> {
             synchronized (lock) {
@@ -118,11 +114,19 @@ public class SwerveSubsystem extends SubsystemBase {
         io.addVisionMeasurement(visionMeasurement, timestampSeconds);
     }
 
-    public Command sysIdQuasistatic(SysIdRoutine.Direction direction) {
-        return m_sysIdRoutineToApply.quasistatic(direction);
+    public Command sysIdTranslationQuasistatic(SysIdRoutine.Direction direction) {
+        return m_sysIdRoutineTranslation.quasistatic(direction);
     }
 
-    public Command sysIdDynamic(SysIdRoutine.Direction direction) {
-        return m_sysIdRoutineToApply.dynamic(direction);
+    public Command sysIdTranslationDynamic(SysIdRoutine.Direction direction) {
+        return m_sysIdRoutineTranslation.dynamic(direction);
+    }
+
+    public Command sysIdSteerQuasistatic(SysIdRoutine.Direction direction) {
+        return m_sysIdRoutineSteer.quasistatic(direction);
+    }
+
+    public Command sysIdSteerDynamic(SysIdRoutine.Direction direction) {
+        return m_sysIdRoutineSteer.dynamic(direction);
     }
 }
