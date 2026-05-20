@@ -29,6 +29,8 @@ public interface SwerveIO extends IoRefresher {
         public double yawRateRadPerSec = 0.0;
         public double accelXMetersPerSecSq = 0.0;
         public double accelYMetersPerSecSq = 0.0;
+            public double accelZMetersPerSecSq = 0.0;
+
         public double timeStamp = 0.0;
     }
 

@@ -55,10 +55,12 @@ public class PusherSubsystem extends SubsystemBase {
         leader = new SparkFlex(leaderCanId, MotorType.kBrushless);
         SparkFlexConfig leaderCfg = new SparkFlexConfig();
         leaderCfg.idleMode(IdleMode.kBrake).smartCurrentLimit(40);
-        leaderCfg.closedLoop.pid(kP, 0.0, 0.0).outputRange(-1.0, 1.0);
+        leaderCfg.closedLoop.pid(7.0722, 0.0, 0.22843).outputRange(-1.0, 1.0);
         leaderCfg.softLimit
             .forwardSoftLimit(maxRotations).forwardSoftLimitEnabled(true)
             .reverseSoftLimit(minRotations).reverseSoftLimitEnabled(true);
+        leaderCfg.inverted(true);
+        leaderCfg.closedLoop.feedForward.kS(0.22271).kV(0.10487).kA(0.0039511);
         leader.configure(leaderCfg, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
         follower = new SparkFlex(followerCanId, MotorType.kBrushless);

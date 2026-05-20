@@ -62,10 +62,12 @@ public class LiftSubsystem extends SubsystemBase {
         leader = new SparkFlex(leaderCanId, MotorType.kBrushless);
         SparkFlexConfig leaderCfg = new SparkFlexConfig();
         leaderCfg.idleMode(IdleMode.kBrake).smartCurrentLimit(60);
-        leaderCfg.closedLoop.pid(kP, 0.0, 0.0).outputRange(-1.0, 1.0);
+        leaderCfg.closedLoop.pid(18.804, 0.0, 0.36724).outputRange(-1.0, 1.0);
+        leaderCfg.closedLoop.feedForward.svag(0.14216,0.10969,0.0049733,0.083706);
         leaderCfg.softLimit
             .forwardSoftLimit(maxRotations).forwardSoftLimitEnabled(true)
             .reverseSoftLimit(minRotations).reverseSoftLimitEnabled(true);
+        leaderCfg.inverted(true);
         leader.configure(leaderCfg, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
         followers = new SparkFlex[followerCanIds.length];

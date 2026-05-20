@@ -44,10 +44,10 @@ public class RobotContainer {
 
     // operator preset positions, in leader-motor rotations (TUNE)
     private static final double LIFT_HOME_ROT = 0.0;
-    private static final double LIFT_DELIVER_ROT = 8.0;
+    private static final double LIFT_DELIVER_ROT = 40.0;
     private static final double PUSHER_RETRACTED_ROT = 0.0;
-    private static final double PUSHER_EXTENDED_ROT = 5.0;
-    private static final double PRESSER_TEST_ROT = 20.0; // bench press-test height
+    private static final double PUSHER_EXTENDED_ROT = 31.0;
+    private static final double PRESSER_TEST_ROT = 30.0; // bench press-test height
 
     // === driver / operator inputs ===
     private final CommandXboxController driver = new CommandXboxController(0);
@@ -198,10 +198,10 @@ public class RobotContainer {
 
         // ---- lift / pusher presets (teleop only, so they don't clash with SysId
         //      which reuses A/B/X/Y in Test mode) ----
-        teleop.and(operator.a()).onTrue(Commands.runOnce(() -> lift.setPosition(LIFT_HOME_ROT), lift));
-        teleop.and(operator.b()).onTrue(Commands.runOnce(() -> lift.setPosition(LIFT_DELIVER_ROT), lift));
-        teleop.and(operator.x()).onTrue(Commands.runOnce(() -> pusher.setPosition(PUSHER_RETRACTED_ROT), pusher));
-        teleop.and(operator.y()).onTrue(Commands.runOnce(() -> pusher.setPosition(PUSHER_EXTENDED_ROT), pusher));
+        teleop.and(operator.a()).onTrue(Commands.run(() -> lift.setPosition(LIFT_HOME_ROT), lift));
+        teleop.and(operator.b()).onTrue(Commands.run(() -> lift.setPosition(LIFT_DELIVER_ROT), lift));
+        teleop.and(operator.x()).onTrue(Commands.run(() -> pusher.setPosition(PUSHER_RETRACTED_ROT), pusher));
+        teleop.and(operator.y()).onTrue(Commands.run(() -> pusher.setPosition(PUSHER_EXTENDED_ROT), pusher));
 
         // ---- presser lift jog (hold) + poker ----
         operator.leftBumper().whileTrue(Commands.run(() -> presser.setOpenLoop(PRESSER_JOG_SCALE), presser));

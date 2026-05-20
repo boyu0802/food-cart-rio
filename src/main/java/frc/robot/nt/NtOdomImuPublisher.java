@@ -30,6 +30,8 @@ public class NtOdomImuPublisher {
     private final DoublePublisher imuYawRate;
     private final DoublePublisher imuAccelX;
     private final DoublePublisher imuAccelY;
+    private final DoublePublisher imuAccelZ;
+
 
     private final Notifier imuNotifier;
 
@@ -53,6 +55,7 @@ public class NtOdomImuPublisher {
         imuYawRate = imu.getDoubleTopic(NtContract.IMU_YAW_RATE).publish();
         imuAccelX = imu.getDoubleTopic(NtContract.IMU_ACCEL_X).publish();
         imuAccelY = imu.getDoubleTopic(NtContract.IMU_ACCEL_Y).publish();
+        imuAccelZ = imu.getDoubleTopic(NtContract.IMU_ACCEL_Z).publish();
 
         imuNotifier = new Notifier(this::publishImu);
         imuNotifier.setName("NtImuPublisher");
@@ -76,6 +79,7 @@ public class NtOdomImuPublisher {
         imuYawRate.set(swerve.getYawRateRadPerSec());
         imuAccelX.set(swerve.getAccelXMetersPerSecSq());
         imuAccelY.set(swerve.getAccelYMetersPerSecSq());
+        imuAccelZ.set(swerve.getAccelZMetersPerSecSq());
     }
 
     public void close() {

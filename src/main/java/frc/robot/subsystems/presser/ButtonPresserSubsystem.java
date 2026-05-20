@@ -55,7 +55,8 @@ public class ButtonPresserSubsystem extends SubsystemBase {
         motor = new SparkFlex(canId, MotorType.kBrushless);
         SparkFlexConfig cfg = new SparkFlexConfig();
         cfg.idleMode(IdleMode.kBrake).smartCurrentLimit(40);
-        cfg.closedLoop.pid(kP, 0.0, 0.0).outputRange(-1.0, 1.0);
+        cfg.closedLoop.pid(18.306, 0.0, 0.35881).outputRange(-1.0, 1.0);
+        cfg.closedLoop.feedForward.kG(0.021784).kS(0.12583).kV(0.10418);
         cfg.softLimit
             .forwardSoftLimit(maxRotations).forwardSoftLimitEnabled(true)
             .reverseSoftLimit(minRotations).reverseSoftLimitEnabled(true);
