@@ -110,6 +110,10 @@ public class SwerveSubsystem extends SubsystemBase {
         return inputs.accelYMetersPerSecSq;
     }
 
+    public double getAccelZMetersPerSecSq() {
+        return inputs.accelZMetersPerSecSq;
+    }
+
     public void addVisionMeasurement(Pose2d visionMeasurement, double timestampSeconds) {
         io.addVisionMeasurement(visionMeasurement, timestampSeconds);
     }

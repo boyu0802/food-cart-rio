@@ -33,6 +33,7 @@ public final class NtContract {
     public static final String IMU_YAW_RATE = "yaw_rate";
     public static final String IMU_ACCEL_X = "accel_x";
     public static final String IMU_ACCEL_Y = "accel_y";
+    public static final String IMU_ACCEL_Z = "accel_z";
 
     public static final String ROBOT_PRESS_DONE_KEY = "Robot/elevator/press_done";
     public static final String ROBOT_MISSION_START_KEY = "Robot/mission/start_pressed";

@@ -37,6 +37,7 @@ public class SwerveIOCTRE extends SwerveDrivetrain<TalonFX, TalonFX, CANcoder> i
     private final StatusSignal<AngularVelocity> pigeonYawRate;
     private final StatusSignal<LinearAcceleration> pigeonAccelX;
     private final StatusSignal<LinearAcceleration> pigeonAccelY;
+    private final StatusSignal<LinearAcceleration> pigeonAccelZ;
 
     @SafeVarargs
     public SwerveIOCTRE(SwerveDrivetrainConstants constants, SwerveModuleConstants<?, ?, ?>... moduleConstants) {
@@ -68,7 +69,9 @@ public class SwerveIOCTRE extends SwerveDrivetrain<TalonFX, TalonFX, CANcoder> i
         pigeonYawRate = pigeon.getAngularVelocityZWorld();
         pigeonAccelX = pigeon.getAccelerationX();
         pigeonAccelY = pigeon.getAccelerationY();
-        BaseStatusSignal.setUpdateFrequencyForAll(100.0, pigeonYawRate, pigeonAccelX, pigeonAccelY);
+        pigeonAccelZ = pigeon.getAccelerationZ();
+        BaseStatusSignal.setUpdateFrequencyForAll(
+            100.0, pigeonYawRate, pigeonAccelX, pigeonAccelY, pigeonAccelZ);
     }
 
     @Override
@@ -88,6 +91,7 @@ public class SwerveIOCTRE extends SwerveDrivetrain<TalonFX, TalonFX, CANcoder> i
         inputs.yawRateRadPerSec = pigeonYawRate.getValue().in(RadiansPerSecond);
         inputs.accelXMetersPerSecSq = pigeonAccelX.getValue().in(MetersPerSecondPerSecond);
         inputs.accelYMetersPerSecSq = pigeonAccelY.getValue().in(MetersPerSecondPerSecond);
+        inputs.accelZMetersPerSecSq = pigeonAccelZ.getValue().in(MetersPerSecondPerSecond);
     }
 
     @Override
@@ -127,7 +131,7 @@ public class SwerveIOCTRE extends SwerveDrivetrain<TalonFX, TalonFX, CANcoder> i
             var moduleMap = swerveModuleSignals.get(i);
             BaseStatusSignal.refreshAll(moduleMap.values().toArray(new BaseStatusSignal[0]));
         }
-        BaseStatusSignal.refreshAll(pigeonYawRate, pigeonAccelX, pigeonAccelY);
+        BaseStatusSignal.refreshAll(pigeonYawRate, pigeonAccelX, pigeonAccelY, pigeonAccelZ);
     }
 
     @Override

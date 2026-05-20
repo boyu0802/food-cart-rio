@@ -11,7 +11,7 @@ import frc.robot.subsystems.drive.SwerveSubsystem;
 /**
  * Publishes the rio-side half of the nt_bridge contract:
  *   Robot/odom/{x,y,theta,vx,vy,omega}  @ robot loop (50 Hz)
- *   Robot/imu/{yaw,yaw_rate,accel_x,accel_y}  @ 100 Hz via Notifier
+ *   Robot/imu/{yaw,yaw_rate,accel_x,accel_y,accel_z}  @ 100 Hz via Notifier
  *
  * Frame convention: ROS2 REP-103 — x forward, y left, yaw CCW positive.
  * vx/vy/omega in Robot/odom are body-frame (the contract calls them out as such).
@@ -30,6 +30,7 @@ public class NtOdomImuPublisher {
     private final DoublePublisher imuYawRate;
     private final DoublePublisher imuAccelX;
     private final DoublePublisher imuAccelY;
+    private final DoublePublisher imuAccelZ;
 
     private final Notifier imuNotifier;
 
@@ -53,6 +54,7 @@ public class NtOdomImuPublisher {
         imuYawRate = imu.getDoubleTopic(NtContract.IMU_YAW_RATE).publish();
         imuAccelX = imu.getDoubleTopic(NtContract.IMU_ACCEL_X).publish();
         imuAccelY = imu.getDoubleTopic(NtContract.IMU_ACCEL_Y).publish();
+        imuAccelZ = imu.getDoubleTopic(NtContract.IMU_ACCEL_Z).publish();
 
         imuNotifier = new Notifier(this::publishImu);
         imuNotifier.setName("NtImuPublisher");
@@ -76,6 +78,7 @@ public class NtOdomImuPublisher {
         imuYawRate.set(swerve.getYawRateRadPerSec());
         imuAccelX.set(swerve.getAccelXMetersPerSecSq());
         imuAccelY.set(swerve.getAccelYMetersPerSecSq());
+        imuAccelZ.set(swerve.getAccelZMetersPerSecSq());
     }
 
     public void close() {
